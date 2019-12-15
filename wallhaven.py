@@ -1,25 +1,15 @@
 from concurrent.futures import ThreadPoolExecutor
-import time
-import requests
-import math
-import shutil
-import threading
-import os
+import time, requests, math, shutil, threading, os, sys, getopt
 from bs4 import BeautifulSoup
 
 headers = {'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:70.0) Gecko/20100101 Firefox/70.0'}
-#请自行修改自己得SSR代理端口
-proxies = {'https':'127.0.0.1:1080',
-            'http':'127.0.0.1:1080'
-        }
 hrefs = []   #存放所有图片链接的地址
 n = 0       #爬取张数
-have = []   # 查看剩余多少下载
 
 #获取页面的HTML代码
 def get_html(url):
     try:
-        res = requests.get(url,headers=headers,proxies=proxies,timeout=3)
+        res = requests.get(url,headers=headers,timeout=3)
         if res.status_code == 200:
           return res
         else: return 0
@@ -32,12 +22,11 @@ def  img_url(i):
     for item in range(1,i):
         item = str(item)
         url = "https://wallhaven.cc/search?sorting=views&page="+item
-        print("[-] 正在尝试连接Page "+item)
+        print("\r [-] 正在尝试连接Page %s  "% (item),end='')
         html = get_html(url)
         while html == 0 : 
-            print("[!] 尝试重新连接Page "+item)
+            print("\r [!] 尝试重新连接Page %s   "%(item),end='')
             html = get_html(url)
-        print("[+] 连接成功")
         html = html.text
         soup = BeautifulSoup(html,'lxml')
         li = soup.find(id='thumbs').find(class_ = 'thumb-listing-page').find_all('li')
@@ -49,7 +38,6 @@ def  img_url(i):
 def download_url(url,i):    
         html = get_html(url)
         while html == 0 : 
-            print("[!] 尝试重新连接 img"+str(i))
             html = get_html(url)
         html = html.text
         soup = BeautifulSoup(html,'lxml')
@@ -58,47 +46,64 @@ def download_url(url,i):
 
 #通过图片链接保存图片到本地
 def download(url,i):           
-    global have
-    print("[+] downloading img "+i)
+    global n
     filename = i+".jpg"
     html = get_html(url)
     while html == 0:
-        print("[-] 尝试重新下载 img"+i)
-        print("[+] Remainnig: %s"% (have))
         html = get_html(url)
     with open(filename,'wb') as f:
         html = html.content
         f.write(html)
-    have.remove(int(i))
-    print("[+] Remainnig: %s"% (have))
+        n -=1
+    print("\r ID  %s 已下载 | 剩余:%s  "% (i,str(n)),end='')
 
 #创建线程池提高爬虫效率
 def pool(img_url,works):          
     global n
+    ends = n
     start_time = time.time()
     with  ThreadPoolExecutor(works) as exector :          #设置线程数
         j = 1
-        for url in img_url[:n]:
+        for url in img_url[:ends]:
             exector.submit(download_url,url,str(j))    #提交给线程池要执行的任务
             j += 1
     end_time = time.time()
-    print("\n耗时: "+str(end_time-start_time))
-
+    times = round((end_time-start_time)/60,2)
+    print("\n耗时: %s m"% (str(times)))
+        
+def usage():
+    print('-n    爬取张数\n-t    开启线程数\n-f    保存文件名\n 默认30线程，文件名为images')
+    sys.exit(0)
+ 
 def main():
     global n
-    global have
-    n = int(input("想爬多少张: "))
-    works = int(input("想开启的线程数: "))
-    have=list(range(1,n+1))  
-    i = math.ceil(n/24)+1
-    img_url(i)
-    print("[+] 正在准备下载...")
-    name = 'images'  #文件夹名
+    works = 30
+    filename = 'images'
+    if not len(sys.argv[1:]):
+        usage()
+    try: 
+        options,args = getopt.getopt(sys.argv[1:],'n:t:f:')
+    except getopt.GetoptError as e:
+        print(str(e))
+        usage()
+    for name, value in options:
+        if name =='-n':
+            n = int(value)
+        elif name == '-t':
+            works = int(value)
+        elif name == '-f':
+            filename = value
+        else:
+            assert False,'unhandled option'
+    
+    page = math.ceil(n/24)+1
+    img_url(page)
+    print("\n [+] 正在准备下载...")
     try:
-      shutil.rmtree(name) #删除文件夹和文件夹下所有文件
+      shutil.rmtree(filename) #删除已存在文件夹和文件夹下所有文件
     except:pass
-    os.mkdir(name)
-    os.chdir(name)
+    os.mkdir(filename)
+    os.chdir(filename)
     pool(hrefs,works)
     print('[+] Download Over!')
 
