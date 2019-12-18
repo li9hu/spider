@@ -16,7 +16,7 @@ def choose(url,soup,t):
 
 def spider(url,t):
 	if 1 :
-		res = requests.get(url,headers=header,timeout=1)
+		res = requests.get(url,headers=header,timeout=3)
 		if res.status_code == 200:
 			html = res.text
 			soup = BeautifulSoup(html,'lxml')
