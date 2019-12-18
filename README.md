@@ -6,5 +6,3 @@
 `thread1.py` --- 多线程的练习
 
 `wallhaven.py` --- 使用线程池爬取`wallhaven`的壁纸
-
-`proxies` --- 利用爬虫线程池批量爬取生成代理池
